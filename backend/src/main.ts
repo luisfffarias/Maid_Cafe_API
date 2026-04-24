@@ -22,6 +22,7 @@ async function bootstrap() {
     .setTitle('Maid Café API')
     .setDescription('Sistema de gestão para Maid Café - Entrega FATEC')
     .setVersion('1.0')
+    .addBearerAuth()
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

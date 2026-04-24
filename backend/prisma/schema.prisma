@@ -20,4 +20,68 @@ model User {
   role      Role     @default(USER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  orders Order[]
+}
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  products  Product[] // Relação: Uma categoria tem vários produtos
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String?  // O "?" significa que a descrição é opcional
+  price       Float    // Usamos Float para valores quebrados (ex: 19.99)
+  imageUrl    String?  // Opcional: Link para a foto do Omurice!
+  stock       Int      @default(0)    // Quantidade real na geladeira
+  isAvailable Boolean  @default(true) // Facilita "pausar" a venda se acabar o estoque
+  
+  // Relação com a Categoria
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orderItems OrderItem[]
+}
+
+enum OrderStatus {
+  OPEN      // Carrinho aberto
+  PENDING   // Enviado para a cozinha
+  PREPARING // Sendo feito pela Maid
+  DELIVERED // Entregue na mesa
+  CANCELED  // Cancelado
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  tableNumber Int         // Número da mesa no café
+  status      OrderStatus @default(OPEN)
+  total       Float       @default(0)
+  paymentMethod String?
+  
+  // Relacionamentos
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  items       OrderItem[]
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  quantity  Int
+  price     Float   // Preço unitário no momento da compra (histórico)
+  
+  // Relacionamentos
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
 }
