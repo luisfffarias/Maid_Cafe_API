@@ -24,4 +24,4 @@ RUN npm run build
 EXPOSE 3000
 
 # Comando final que inicia o servidor em produção
-CMD ["npm", "run", "start:prod"]
+CMD ["sh", "-c", "node dist/main.js || node dist/src/main.js"]
