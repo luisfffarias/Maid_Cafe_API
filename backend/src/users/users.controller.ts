@@ -18,17 +18,19 @@ export class UsersController {
   }
 
   @Get(':id')
+  // Removido o + pois o ID no banco é String (UUID)
   findOne(@Param('id') id: string) {
-    return this.usersService.findOne(+id);
+    return this.usersService.findOne(id);
   }
 
   @Patch(':id')
+  // Removido o + para manter a consistência com UUID
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(+id, updateUserDto);
+    return this.usersService.update(id, updateUserDto);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.usersService.remove(+id);
+    return this.usersService.remove(id);
   }
 }
