@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type Role = 'USER' | 'MAID' | 'ADMIN';
 
-// 👇 Adicionada a interface User que estava a faltar!
+// Interfaces
 export interface User {
   id: string;
   name: string;
@@ -24,7 +24,25 @@ export interface RegisterResponse {
   updatedAt: string;
 }
 
-// 👇 Aqui está a função auxiliar (Helper) que limpa o seu código!
+export interface OrderItem {
+  id: string;
+  quantity: number;
+  price: number;
+  product: {
+    name: string;
+    imageUrl: string;
+  };
+}
+
+export interface Order {
+  id: string;
+  tableNumber: number;
+  status: string;
+  total: number;
+  items: OrderItem[];
+}
+
+// Helper de Autenticação
 export async function authHeaders(): Promise<Record<string, string>> {
   const token = await getToken();
   if (!token) {
@@ -36,6 +54,7 @@ export async function authHeaders(): Promise<Record<string, string>> {
   };
 }
 
+// Funções de Auth
 export async function login(email: string, password: string): Promise<LoginResponse> {
   const res = await fetch(`${BASE_URL}/auth/login`, {
     method: 'POST',
@@ -44,21 +63,13 @@ export async function login(email: string, password: string): Promise<LoginRespo
   });
 
   const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(data.message || 'Erro ao fazer login.');
-  }
+  if (!res.ok) throw new Error(data.message || 'Erro ao fazer login.');
 
   await AsyncStorage.setItem('access_token', data.access_token);
   return data;
 }
 
-export async function register(
-  name: string,
-  email: string,
-  password: string,
-  role: Role = 'USER'
-): Promise<RegisterResponse> {
+export async function register(name: string, email: string, password: string, role: Role = 'USER'): Promise<RegisterResponse> {
   const res = await fetch(`${BASE_URL}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -66,11 +77,7 @@ export async function register(
   });
 
   const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(data.message || 'Erro ao cadastrar.');
-  }
-
+  if (!res.ok) throw new Error(data.message || 'Erro ao cadastrar.');
   return data;
 }
 
@@ -82,55 +89,72 @@ export async function logout(): Promise<void> {
   await AsyncStorage.removeItem('access_token');
 }
 
+// Funções de Carrinho e Pedidos
 export async function addToCart(productId: string, quantity: number = 1, tableNumber: number = 1) {
-  // Já podemos usar a nova função authHeaders aqui também se quiser no futuro!
-  const token = await getToken();
-  
-  if (!token) {
-    throw new Error('Sessão expirada. Faça login novamente.');
-  }
-
-  const payload = { 
-    productId, 
-    quantity, 
-    tableNumber 
-  };
-  
-  console.log("📦 A enviar para a API:", payload);
-
   const res = await fetch(`${BASE_URL}/orders/cart`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify(payload), 
+    headers: await authHeaders(),
+    body: JSON.stringify({ productId, quantity, tableNumber }), 
   });
 
   const data = await res.json();
-
   if (!res.ok) {
-    const errorDetails = Array.isArray(data.message) 
-      ? data.message.join('\n') 
-      : data.message;
-      
+    const errorDetails = Array.isArray(data.message) ? data.message.join('\n') : data.message;
     throw new Error(errorDetails || 'Erro ao adicionar ao carrinho.');
   }
-
   return data;
 }
 
-export async function updateProductStock(productId: string, stock: number) {
-  const token = await getToken();
-  const res = await fetch(`${BASE_URL}/products/${productId}/availability`, {
+export async function getCart(): Promise<Order> {
+  const res = await fetch(`${BASE_URL}/orders/cart`, {
+    method: 'GET',
+    headers: await authHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Erro ao buscar o carrinho.');
+  return data;
+}
+
+export async function updateCartItem(itemId: string, quantity: number): Promise<Order> {
+  const res = await fetch(`${BASE_URL}/orders/cart/item/${itemId}`, {
     method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
+    headers: await authHeaders(),
+    body: JSON.stringify({ quantity }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Erro ao atualizar quantidade.');
+  return data;
+}
+
+export async function removeCartItem(itemId: string): Promise<void> {
+  const res = await fetch(`${BASE_URL}/orders/cart/item/${itemId}`, {
+    method: 'DELETE',
+    headers: await authHeaders(),
+  });
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.message || 'Erro ao remover item.');
+  }
+}
+
+export async function checkout(): Promise<void> {
+  const res = await fetch(`${BASE_URL}/orders/checkout`, {
+    method: 'POST',
+    headers: await authHeaders(),
+  });
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.message || 'Erro ao finalizar pedido.');
+  }
+}
+
+// Outras funções de Produto/Admin
+export async function updateProductStock(productId: string, stock: number) {
+  const res = await fetch(`${BASE_URL}/products/${productId}`, {
+    method: 'PATCH',
+    headers: await authHeaders(),
     body: JSON.stringify({ stock: stock, isAvailable: stock > 0 }),
   });
-
   if (!res.ok) {
     const data = await res.json();
     throw new Error(data.message || 'Erro ao atualizar o estoque.');
@@ -139,16 +163,11 @@ export async function updateProductStock(productId: string, stock: number) {
 }
 
 export async function createCategory(name: string) {
-  const token = await getToken();
   const res = await fetch(`${BASE_URL}/categories`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
+    headers: await authHeaders(),
     body: JSON.stringify({ name }),
   });
-
   if (!res.ok) {
     const data = await res.json();
     throw new Error(data.message || 'Erro ao criar categoria.');
@@ -156,19 +175,12 @@ export async function createCategory(name: string) {
   return res.json();
 }
 
-export async function createProduct(productData: { 
-  name: string, description: string, price: number, imageUrl: string, categoryId: string 
-}) {
-  const token = await getToken();
+export async function createProduct(productData: any) {
   const res = await fetch(`${BASE_URL}/products`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
+    headers: await authHeaders(),
     body: JSON.stringify(productData),
   });
-
   if (!res.ok) {
     const data = await res.json();
     throw new Error(data.message || 'Erro ao criar produto.');
@@ -177,32 +189,17 @@ export async function createProduct(productData: {
 }
 
 export async function getCategories() {
-  const token = await getToken();
-  const res = await fetch(`${BASE_URL}/categories`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}` 
-    }
-  });
+  const res = await fetch(`${BASE_URL}/categories`, { headers: await authHeaders() });
   if (!res.ok) throw new Error('Erro ao buscar categorias.');
   return res.json();
 }
 
 export async function getProducts() {
-  const token = await getToken();
-  const res = await fetch(`${BASE_URL}/products`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}` 
-    }
-  });
+  const res = await fetch(`${BASE_URL}/products`, { headers: await authHeaders() });
   if (!res.ok) throw new Error('Erro ao buscar produtos.');
   return res.json();
 }
 
-// 👇 As suas funções agora vão funcionar perfeitamente com o helper!
 export async function getUsers(): Promise<User[]> {
   const res = await fetch(`${BASE_URL}/users`, { headers: await authHeaders() });
   const data = await res.json();
