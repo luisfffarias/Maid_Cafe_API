@@ -61,3 +61,40 @@ export async function getToken(): Promise<string | null> {
 export async function logout(): Promise<void> {
   await AsyncStorage.removeItem('access_token');
 }
+export async function addToCart(productId: string, quantity: number = 1, tableNumber: number = 1) {
+  const token = await getToken();
+  
+  if (!token) {
+    throw new Error('Sessão expirada. Faça login novamente.');
+  }
+
+  // Agora enviamos o pacote completo que o AddItemDto exige!
+  const payload = { 
+    productId, 
+    quantity, 
+    tableNumber // 👈 Adicionámos o número da mesa
+  };
+  
+  console.log("📦 A enviar para a API:", payload);
+
+  const res = await fetch(`${BASE_URL}/orders/cart`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(payload), 
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    const errorDetails = Array.isArray(data.message) 
+      ? data.message.join('\n') 
+      : data.message;
+      
+    throw new Error(errorDetails || 'Erro ao adicionar ao carrinho.');
+  }
+
+  return data;
+}
