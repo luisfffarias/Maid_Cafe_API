@@ -220,3 +220,49 @@ export async function updateUserRole(id: string, role: Role): Promise<User> {
   if (!res.ok) throw new Error(data.message || 'Erro ao atualizar usuário.');
   return data;
 }
+
+// --- GESTÃO DE PEDIDOS (COZINHA) ---
+
+// Tipagens (Ajuste se o backend enviar propriedades com nomes ligeiramente diferentes)
+export type OrderStatus = 'OPEN' | 'PENDING' | 'PREPARING' | 'DELIVERED' | 'CANCELED';
+
+export interface OrderItem {
+  id: string;
+  quantity: number;
+  product: {
+    name: string;
+  };
+}
+
+export interface Order {
+  id: string;
+  tableNumber: number;
+  status: OrderStatus;
+  createdAt: string;
+  items: OrderItem[]; // Assumindo que a API traz os itens do pedido juntos
+}
+
+// 1. Buscar a Fila da Cozinha
+export async function getOrderQueue(): Promise<Order[]> {
+  const res = await fetch(`${BASE_URL}/orders/queue`, { 
+    method: 'GET',
+    headers: await authHeaders() 
+  });
+  
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Erro ao buscar fila da cozinha.');
+  return data;
+}
+
+// 2. Atualizar o Status do Pedido
+export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<Order> {
+  const res = await fetch(`${BASE_URL}/orders/${orderId}/status`, { 
+    method: 'PATCH', 
+    headers: await authHeaders(), 
+    body: JSON.stringify({ status }) 
+  });
+  
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Erro ao atualizar pedido.');
+  return data;
+}
