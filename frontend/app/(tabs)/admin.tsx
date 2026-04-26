@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, RefreshControl,
+  ActivityIndicator, RefreshControl, Platform, Alert,
 } from 'react-native';
 import {
-  getUsers, updateUserRole,
+  getUsers, updateUserRole, deleteUser, getToken, decodeToken,
   User, Role,
 } from '../../services/api';
 
@@ -17,11 +17,18 @@ export default function AdminScreen() {
   const [usersLoading, setUsersLoading] = useState(true);
   const [usersError, setUsersError] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   async function loadUsers() {
     setUsersLoading(true);
     setUsersError('');
     try {
+      const token = await getToken();
+      if (token) {
+        const decoded = decodeToken(token);
+        if (decoded) setCurrentUserId(decoded.sub);
+      }
       const data = await getUsers();
       setUsers(data);
     } catch (err: any) {
@@ -31,9 +38,7 @@ export default function AdminScreen() {
     }
   }
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
+  useEffect(() => { loadUsers(); }, []);
 
   async function handleRoleChange(user: User, role: Role) {
     setUpdatingId(user.id);
@@ -44,6 +49,35 @@ export default function AdminScreen() {
       setUsersError(err.message);
     } finally {
       setUpdatingId(null);
+    }
+  }
+
+  async function executeDelete(user: User) {
+    setDeletingId(user.id);
+    try {
+      await deleteUser(user.id);
+      setUsers((prev) => prev.filter((u) => u.id !== user.id));
+    } catch (err: any) {
+      setUsersError(err.message);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  function handleDelete(user: User) {
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Excluir ${user.name}? Esta ação não pode ser desfeita.`)) {
+        executeDelete(user);
+      }
+    } else {
+      Alert.alert(
+        'Excluir usuário',
+        `Tem certeza que deseja excluir ${user.name}? Esta ação não pode ser desfeita.`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Excluir', style: 'destructive', onPress: () => executeDelete(user) },
+        ]
+      );
     }
   }
 
@@ -59,18 +93,34 @@ export default function AdminScreen() {
         refreshControl={<RefreshControl refreshing={usersLoading} onRefresh={loadUsers} tintColor="#e91e8c" />}
       >
         {usersError ? <Text style={styles.errorText}>{usersError}</Text> : null}
-        
-        {users.map((user) => (
+
+        {users.filter((u) => u.id !== currentUserId).map((user) => (
           <View key={user.id} style={styles.userCard}>
-            <View style={styles.userInfo}>
-              <Text style={styles.userName}>{user.name}</Text>
-              <Text style={styles.userEmail}>{user.email}</Text>
-              <View style={[styles.roleBadge, { backgroundColor: ROLE_COLOR[user.role] + '22' }]}>
-                <Text style={[styles.roleBadgeText, { color: ROLE_COLOR[user.role] }]}>
-                  {ROLE_LABEL[user.role]}
-                </Text>
+            <View style={styles.userHeader}>
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>{user.name}</Text>
+                <Text style={styles.userEmail}>{user.email}</Text>
+                <View style={[styles.roleBadge, { backgroundColor: ROLE_COLOR[user.role] + '22' }]}>
+                  <Text style={[styles.roleBadgeText, { color: ROLE_COLOR[user.role] }]}>
+                    {ROLE_LABEL[user.role]}
+                  </Text>
+                </View>
               </View>
+
+              {/* Botão excluir */}
+              <TouchableOpacity
+                style={styles.deleteBtn}
+                onPress={() => handleDelete(user)}
+                disabled={deletingId === user.id}
+              >
+                {deletingId === user.id
+                  ? <ActivityIndicator color="#c2185b" size="small" />
+                  : <Text style={styles.deleteBtnText}>🗑️</Text>
+                }
+              </TouchableOpacity>
             </View>
+
+            {/* Botões de role */}
             <View style={styles.roleButtons}>
               {updatingId === user.id ? (
                 <ActivityIndicator color="#e91e8c" />
@@ -91,8 +141,7 @@ export default function AdminScreen() {
             </View>
           </View>
         ))}
-        
-        {/* Espaço extra no final da lista */}
+
         <View style={{ height: 20 }} />
       </ScrollView>
     </View>
@@ -115,13 +164,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12,
     borderWidth: 1, borderColor: '#fce4ec', elevation: 2,
   },
-  userInfo: { marginBottom: 12 },
+  userHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+  userInfo: { flex: 1 },
   userName: { fontSize: 15, fontWeight: '700', color: '#2d1b2e' },
   userEmail: { fontSize: 12, color: '#aaa', marginTop: 2 },
-  
   roleBadge: { alignSelf: 'flex-start', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3, marginTop: 6 },
   roleBadgeText: { fontSize: 12, fontWeight: '700' },
-  
+
+  deleteBtn: { padding: 8, borderRadius: 10, backgroundColor: '#fce4ec', marginLeft: 8 },
+  deleteBtnText: { fontSize: 18 },
+
   roleButtons: { flexDirection: 'row', gap: 8 },
   roleBtn: {
     flex: 1, paddingVertical: 7, borderRadius: 10, borderWidth: 1.5,
