@@ -37,7 +37,7 @@ model Product {
   description String?  // O "?" significa que a descrição é opcional
   price       Float    // Usamos Float para valores quebrados (ex: 19.99)
   imageUrl    String?  // Opcional: Link para a foto do Omurice!
-  stock       Int      @default(0)    // Quantidade real na geladeira
+  stock       Int      @default(1)    // Quantidade real na geladeira
   isAvailable Boolean  @default(true) // Facilita "pausar" a venda se acabar o estoque
   
   // Relação com a Categoria

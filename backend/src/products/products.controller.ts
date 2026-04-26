@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateAvailabilityDto } from './dto/update-product.dto';
 
 @ApiTags('Produtos / Estoque')
 @ApiBearerAuth()
@@ -28,13 +29,17 @@ export class ProductsController {
   }
 
   @ApiOperation({ summary: 'Admin e Maids: Atualizar disponibilidade de estoque' })
-  @Roles(Role.ADMIN, Role.MAID) // <--- Maids podem alterar apenas disponibilidade
+  @Roles(Role.ADMIN, Role.MAID) 
   @Patch(':id/availability')
-  updateAvailability(@Param('id') id: string, @Body() body: { isAvailable: boolean }) {
-    return this.productsService.updateAvailability(id, body.isAvailable);
+  updateAvailability(
+    @Param('id') id: string, 
+    @Body() updateAvailabilityDto: UpdateAvailabilityDto // <-- Mudei aqui!
+  ) {
+    // Agora passamos o valor pegando de dentro do DTO
+    return this.productsService.updateAvailability(id, updateAvailabilityDto.isAvailable);
   }
 
-  @ApiOperation({ summary: 'Apenas Admin: Editar detalhes ou deletar' })
+ @ApiOperation({ summary: 'Apenas Admin: Deletar produto' })
   @Roles(Role.ADMIN)
   @Delete(':id')
   remove(@Param('id') id: string) {
