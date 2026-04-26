@@ -1,11 +1,4 @@
-import { IsBoolean } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { PartialType } from '@nestjs/swagger';
+import { CreateProductDto } from './create-product.dto';
 
-export class UpdateAvailabilityDto {
-  @ApiProperty({ 
-    example: false, 
-    description: 'Use true para disponível ou false para pausar as vendas' 
-  })
-  @IsBoolean()
-  isAvailable: boolean;
-}
+export class UpdateProductDto extends PartialType(CreateProductDto) {}

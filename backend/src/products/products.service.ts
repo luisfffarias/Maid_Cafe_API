@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service'; // Nossa ponte com o banco!
+import { PrismaService } from '../prisma/prisma.service';
+import { UpdateProductDto } from './dto/update-product.dto';
 
 @Injectable()
 export class ProductsService {
-  // Injeta o PrismaService no construtor
   constructor(private prisma: PrismaService) {}
 
   // ==========================================
@@ -16,7 +16,9 @@ export class ProductsService {
         description: data.description,
         price: data.price,
         imageUrl: data.imageUrl,
-        categoryId: data.categoryId, // Obrigatório: a qual categoria ele pertence?
+        categoryId: data.categoryId, 
+        stock: data.stock, // <-- Adicionado para garantir que salve
+        isAvailable: data.isAvailable, // <-- Adicionado para garantir que salve
       },
     });
   }
@@ -26,8 +28,6 @@ export class ProductsService {
   // ==========================================
   async findAll() {
     return this.prisma.product.findMany({
-      // O Prisma é mágico: o 'include' faz um JOIN automático
-      // e já traz os dados da categoria do produto junto na resposta!
       include: {
         category: true, 
       },
@@ -35,20 +35,19 @@ export class ProductsService {
   }
 
   // ==========================================
-  // ALTERAR ESTOQUE (ADMIN e MAIDS)
+  // ATUALIZAR PRODUTO (Estoque, Preço, etc)
   // ==========================================
-  async updateAvailability(id: string, isAvailable: boolean) {
-    // 1. Verifica se o prato/produto realmente existe
+  async update(id: string, updateProductDto: UpdateProductDto) {
     const product = await this.prisma.product.findUnique({ where: { id } });
     
     if (!product) {
       throw new NotFoundException('Produto não encontrado no cardápio.');
     }
 
-    // 2. Atualiza apenas o campo isAvailable
+    // O Prisma é inteligente e atualiza apenas os campos que vieram no DTO
     return this.prisma.product.update({
       where: { id },
-      data: { isAvailable },
+      data: updateProductDto,
     });
   }
 

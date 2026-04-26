@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsNumber, IsOptional, IsUUID } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsOptional, IsUUID, IsInt, Min, IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateProductDto {
@@ -26,4 +26,19 @@ export class CreateProductDto {
   @IsUUID()
   @IsNotEmpty()
   categoryId: string;
+
+  // ========================================================
+  // NOVOS CAMPOS PARA CONTROLE DE ESTOQUE
+  // ========================================================
+  
+  @ApiProperty({ example: 10, description: 'Quantidade inicial em estoque', required: false })
+  @IsOptional()
+  @IsInt({ message: 'O estoque deve ser um número inteiro.' })
+  @Min(0, { message: 'O estoque não pode ser negativo.' })
+  stock?: number;
+
+  @ApiProperty({ example: true, description: 'Disponível para venda imediata?', required: false })
+  @IsOptional()
+  @IsBoolean()
+  isAvailable?: boolean;
 }
