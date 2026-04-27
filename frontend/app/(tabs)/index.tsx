@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, FlatList, TextInput,
-  TouchableOpacity, ActivityIndicator, Dimensions, ScrollView, Image
+  TouchableOpacity, ActivityIndicator, Dimensions, ScrollView, Image, Platform
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { getToken, logout, addToCart } from '../../services/api'; 
@@ -39,25 +39,30 @@ const ProductCard = ({ item, onAdd }: { item: Product; onAdd: (product: Product)
         }
       </View>
       <View style={styles.infoContainer}>
-        <Text style={styles.productCategory}>{item.category?.name || 'Delícia'}</Text>
-        <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-        <Text style={styles.productDesc} numberOfLines={2}>{item.description}</Text>
-        <Text style={styles.productPrice}>
-          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}
-        </Text>
-        {item.stock > 0 && item.isAvailable && (
-          <Text style={styles.stockText}>Restam: {item.stock}</Text>
-        )}
-        <TouchableOpacity
-          style={[styles.addButton, isOutOfStock && styles.addButtonDisabled]}
-          onPress={handlePress}
-          disabled={isOutOfStock || adding}
-        >
-          {adding
-            ? <ActivityIndicator color="#FFF" size="small" />
-            : <Text style={styles.addButtonText}>{isOutOfStock ? 'Esgotado' : '+ Adicionar'}</Text>
-          }
-        </TouchableOpacity>
+        <View>
+          <Text style={styles.productCategory}>{item.category?.name || 'Delícia'}</Text>
+          <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.productDesc} numberOfLines={2}>{item.description}</Text>
+        </View>
+        
+        <View>
+          <Text style={styles.productPrice}>
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}
+          </Text>
+          {item.stock > 0 && item.isAvailable && (
+            <Text style={styles.stockText}>Restam: {item.stock}</Text>
+          )}
+          <TouchableOpacity
+            style={[styles.addButton, isOutOfStock && styles.addButtonDisabled]}
+            onPress={handlePress}
+            disabled={isOutOfStock || adding}
+          >
+            {adding
+              ? <ActivityIndicator color="#FFF" size="small" />
+              : <Text style={styles.addButtonText}>{isOutOfStock ? 'Esgotado' : '+ Adicionar'}</Text>
+            }
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -172,7 +177,8 @@ export default function MenuScreen() {
         data={filteredProducts}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <ProductCard item={item} onAdd={handleAddToCart} />}
-        numColumns={Dimensions.get('window').width > 600 ? 3 : 2}
+        numColumns={Platform.OS === 'web' ? undefined : 2}
+        key={Platform.OS === 'web' ? 'h' : 'v'}
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={<Text style={styles.emptyText}>Nenhuma delícia encontrada 😿</Text>}
       />
@@ -183,19 +189,42 @@ export default function MenuScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFF0F5' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF0F5' },
-  header: { padding: 20, paddingTop: 40, backgroundColor: '#FFFFFF', borderBottomLeftRadius: 30, borderBottomRightRadius: 30, elevation: 2 },
+  header: { padding: 20, paddingTop: 40, backgroundColor: '#FFFFFF', borderBottomLeftRadius: 30, borderBottomRightRadius: 30, elevation: 2, alignItems: 'center' },
   headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#FF69B4', textAlign: 'center', marginBottom: 15 },
-  searchBar: { backgroundColor: '#FFF5F7', borderRadius: 15, padding: 12, color: '#8B5A2B', borderWidth: 1, borderColor: '#FFC0CB' },
+  searchBar: { width: '100%', maxWidth: 500, backgroundColor: '#FFF5F7', borderRadius: 15, padding: 12, color: '#8B5A2B', borderWidth: 1, borderColor: '#FFC0CB' },
   categoryList: { paddingHorizontal: 20, alignItems: 'center', gap: 10 },
   categoryBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FFC0CB' },
   categoryBtnActive: { backgroundColor: '#FF69B4', borderColor: '#FF69B4' },
   categoryText: { color: '#FF69B4', fontWeight: '600' },
   categoryTextActive: { color: '#FFFFFF' },
-  listContainer: { padding: 10 },
+  
+  listContainer: { 
+    padding: 10,
+    flexDirection: Platform.OS === 'web' ? 'row' : 'column',
+    flexWrap: Platform.OS === 'web' ? 'wrap' : 'nowrap',
+    justifyContent: 'flex-start' // <--- AQUI ESTÁ A MUDANÇA (era 'center')
+  },
+
   emptyText: { textAlign: 'center', color: '#8B5A2B', marginTop: 40, fontSize: 16, fontWeight: '600' },
   feedbackBar: { backgroundColor: '#FF69B4', paddingVertical: 10, paddingHorizontal: 20 },
   feedbackText: { color: '#fff', fontWeight: '600', textAlign: 'center', fontSize: 13 },
-  productCard: { flex: 1, backgroundColor: '#FFF', margin: 8, borderRadius: 20, overflow: 'hidden', elevation: 3, shadowColor: '#FFB6C1', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4 },
+
+  productCard: { 
+    backgroundColor: '#FFF', 
+    margin: 6, 
+    borderRadius: 20, 
+    overflow: 'hidden', 
+    elevation: 3, 
+    shadowColor: '#FFB6C1', 
+    shadowOffset: { width: 0, height: 2 }, 
+    shadowOpacity: 0.3, 
+    shadowRadius: 4,
+    flex: Platform.OS === 'web' ? 0 : 1,
+    minWidth: Platform.OS === 'web' ? 250 : '45%',
+    maxWidth: Platform.OS === 'web' ? 280 : '50%',
+    minHeight: 320 // Mantém o tamanho mínimo para padronizar
+  },
+
   productCardDisabled: { opacity: 0.5 },
   imagePlaceholder: { width: '100%', height: 120, backgroundColor: '#FFF5F7', justifyContent: 'center', alignItems: 'center' },
   image: { width: '100%', height: '100%' },

@@ -189,10 +189,6 @@ export default function ProfileScreen() {
         ))
       )}
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutText}>Sair do Café 👋</Text>
-      </TouchableOpacity>
-
       <View style={{ height: 40 }} />
     </ScrollView>
   );
