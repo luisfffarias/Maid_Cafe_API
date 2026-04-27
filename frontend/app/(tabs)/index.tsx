@@ -112,7 +112,7 @@ export default function MenuScreen() {
   async function handleAddToCart(product: Product) {
     try {
       await addToCart(product.id, 1);
-      setFeedback(`Yatta! "${product.name}" na sua mesa! 🪄✨`);
+      setFeedback(`Produto "${product.name}" adicionado no seu carrinho! 🪄✨`);
       setTimeout(() => setFeedback(''), 2500);
     } catch (error: any) {
       setFeedback(error.message || 'Ops! Magia falhou, tente de novo. 💦');
@@ -122,10 +122,24 @@ export default function MenuScreen() {
 
   const filteredProducts = useMemo(() => {
     if (!Array.isArray(products)) return [];
-    return products.filter(product => {
+    
+    // 1. Primeiro filtramos por categoria e busca (como já estava)
+    const filtered = products.filter(product => {
       const matchCategory = !selectedCategory || product.categoryId === selectedCategory;
       const matchSearch = product.name.toLowerCase().includes(search.toLowerCase());
       return matchCategory && matchSearch;
+    });
+
+    // 2. Agora aplicamos a ordenação (Disponíveis no topo)
+    return filtered.sort((a, b) => {
+      const isAAvailable = a.isAvailable && a.stock > 0;
+      const isBAvailable = b.isAvailable && b.stock > 0;
+
+      if (isAAvailable && !isBAvailable) return -1; // A sobe na lista
+      if (!isAAvailable && isBAvailable) return 1;  // B sobe na lista
+      
+      // Se os dois estão disponíveis (ou os dois esgotados), desempata por ordem alfabética
+      return a.name.localeCompare(b.name);
     });
   }, [products, selectedCategory, search]);
 
