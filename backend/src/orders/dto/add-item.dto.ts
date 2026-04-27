@@ -11,7 +11,5 @@ export class AddItemDto {
   @Min(1)
   quantity: number;
 
-  @ApiProperty({ example: 5, description: 'Número da mesa' })
-  @IsInt()
-  tableNumber: number;
+  
 }

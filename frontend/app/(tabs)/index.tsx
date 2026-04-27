@@ -107,7 +107,7 @@ export default function MenuScreen() {
 
   async function handleAddToCart(product: Product) {
     try {
-      await addToCart(product.id, 1, 1);
+      await addToCart(product.id, 1);
       setFeedback(`"${product.name}" adicionado ao carrinho! 🛒`);
       setTimeout(() => setFeedback(''), 2500);
     } catch (error: any) {
