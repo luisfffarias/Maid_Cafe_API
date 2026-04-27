@@ -301,8 +301,9 @@ export class OrdersService {
       select: { tableNumber: true },
     });
     
-    // Cria um array só com os números das mesas ocupadas (ex: [1, 3, 4])
-    const occupiedTables = activeOrders.map(o => o.tableNumber);
+    // 👇 CORREÇÃO AQUI: Cria um array com os números ÚNICOS das mesas ocupadas.
+    // O Set garante que, se a Mesa 1 tiver 10 pedidos ativos, ela conte como apenas 1 mesa ocupada.
+    const occupiedTables = [...new Set(activeOrders.map(o => o.tableNumber))];
 
     // Se a casa estiver cheia, barra o sistema
     if (occupiedTables.length >= TOTAL_TABLES) {

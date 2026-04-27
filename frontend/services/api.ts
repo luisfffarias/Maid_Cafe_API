@@ -96,8 +96,8 @@ export async function createProduct(productData: { name: string; description?: s
   return res.json();
 }
 
-export async function addToCart(productId: string, quantity: number = 1, tableNumber: number = 1) {
-  const payload = { productId, quantity, tableNumber };
+export async function addToCart(productId: string, quantity: number = 1) {
+  const payload = { productId, quantity };
   const res = await fetch(`${BASE_URL}/orders/cart`, { method: 'POST', headers: await authHeaders(), body: JSON.stringify(payload) });
   const data = await res.json();
   if (!res.ok) {
