@@ -11,7 +11,7 @@ export class OrdersService {
   // 1. ADICIONAR ITEM AO CARRINHO
   // ====================================================================
   async addItem(userId: string, addItemDto: AddItemDto) {
-    const { productId, quantity, tableNumber } = addItemDto;
+    const { productId, quantity } = addItemDto;
 
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
@@ -63,8 +63,33 @@ export class OrdersService {
 
     // ✅ Passou pelas travas! Vamos criar/atualizar o pedido e o item
     if (!openOrder) {
+      // 1. Verifica se o cliente JÁ ESTÁ em uma mesa (pedidos anteriores não finalizados)
+      const sittingOrder = await this.prisma.order.findFirst({
+        where: { 
+          userId, 
+          status: { notIn: ['FINISHED', 'CANCELED'] } // Mantém a mesa se ele ainda estiver comendo
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      // Variável temporária para guardar a mesa escolhida
+      let assignedTable: number;
+
+      if (sittingOrder) {
+        // Se ele já está comendo, herda a mesa que ele já estava!
+        assignedTable = sittingOrder.tableNumber;
+      } else {
+        // Se é um cliente totalmente novo, O ROUND ROBIN ESCOLHE A MESA AQUI!
+        assignedTable = await this.getNextAvailableTable(); 
+      }
+
+      // 2. Agora sim, criamos o carrinho passando a mesa que o backend calculou
       openOrder = await this.prisma.order.create({
-        data: { userId, tableNumber, status: OrderStatus.OPEN },
+        data: { 
+          userId, 
+          tableNumber: assignedTable, // <-- Olha o Prisma recebendo o número correto aqui!
+          status: 'OPEN' // (Se você usar o Enum, troque para OrderStatus.OPEN)
+        },
       });
     }
 
