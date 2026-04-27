@@ -31,11 +31,30 @@ export class OrdersService {
       where: { userId, status: OrderStatus.OPEN },
     });
 
-    if (openOrder) {
-      const existingItem = await this.prisma.orderItem.findFirst({
-        where: { orderId: openOrder.id, productId },
+    if (!openOrder) {
+      // ANTES DE CRIAR, VERIFICA SE O CLIENTE JÁ ESTÁ SENTADO EM UMA MESA COMENDO ALGO
+      const sittingOrder = await this.prisma.order.findFirst({
+        where: { 
+          userId, 
+          status: { notIn: [OrderStatus.FINISHED, OrderStatus.CANCELED] } 
+        },
+        orderBy: { createdAt: 'desc' }
       });
-      if (existingItem) currentQuantityInCart = existingItem.quantity;
+
+      let assignedTable: number;
+
+      if (sittingOrder) {
+        // Se ele já tem um pedido ativo (mesmo que entregue), ele continua na mesma mesa!
+        assignedTable = sittingOrder.tableNumber;
+      } else {
+        // Se ele não tem nada ativo, é um cliente novo. Roda o Round Robin!
+        assignedTable = await this.getNextAvailableTable();
+      }
+
+      // Agora sim, cria o carrinho com a mesa correta
+      openOrder = await this.prisma.order.create({
+        data: { userId, tableNumber: assignedTable, status: OrderStatus.OPEN },
+      });
     }
 
     if (product.stock < (currentQuantityInCart + quantity)) {
@@ -241,5 +260,49 @@ export class OrdersService {
       data: { total },
       include: { items: { include: { product: true } } }, 
     });
+  }
+
+  // ====================================================================
+  // FUNÇÃO AUXILIAR: ROUND ROBIN DE MESAS
+  // ====================================================================
+  private async getNextAvailableTable(): Promise<number> {
+    const TOTAL_TABLES = 10; // Defina quantas mesas existem no Maid Café
+
+    // 1. Descobre quais mesas estão ocupadas agora (qualquer pedido que NÃO seja FINISHED ou CANCELED)
+    const activeOrders = await this.prisma.order.findMany({
+      where: {
+        status: { notIn: [OrderStatus.FINISHED, OrderStatus.CANCELED] },
+      },
+      select: { tableNumber: true },
+    });
+    
+    // Cria um array só com os números das mesas ocupadas (ex: [1, 3, 4])
+    const occupiedTables = activeOrders.map(o => o.tableNumber);
+
+    // Se a casa estiver cheia, barra o sistema
+    if (occupiedTables.length >= TOTAL_TABLES) {
+      throw new BadRequestException('Todas as mesas estão ocupadas no momento. Por favor, aguarde.');
+    }
+
+    // 2. Descobre qual foi a ÚLTIMA mesa a ser designada no restaurante
+    const lastOrder = await this.prisma.order.findFirst({
+      orderBy: { createdAt: 'desc' },
+      select: { tableNumber: true },
+    });
+
+    let startTable = lastOrder ? lastOrder.tableNumber : 0;
+
+    // 3. ROUND ROBIN: Tenta a próxima mesa, girando em loop se chegar no máximo
+    for (let i = 1; i <= TOTAL_TABLES; i++) {
+      let nextTable = (startTable + i) % TOTAL_TABLES;
+      if (nextTable === 0) nextTable = TOTAL_TABLES; // Para evitar a "Mesa 0"
+
+      // Se essa mesa não estiver no array de ocupadas, achamos a vencedora!
+      if (!occupiedTables.includes(nextTable)) {
+        return nextTable;
+      }
+    }
+
+    throw new Error('Erro ao calcular mesa disponível.');
   }
 }

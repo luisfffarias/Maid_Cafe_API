@@ -56,7 +56,17 @@ enum OrderStatus {
   PREPARING // Sendo feito pela Maid
   DELIVERED // Entregue na mesa
   CANCELED  // Cancelado
+  FINISHED  // Pedido Concluido 
 }
+enum OrderMaidType {
+  DEREDERE     // Alegre e energica
+  TSUNDERE   // Hostil que se torna docil
+  DANDERE // Timida e silenciosa
+  ONEESAN // Madura e protetora
+  KUUDERE  // Fria e inexpressiva
+  FINISHED  // Pedido Concluido 
+}
+
 
 model Order {
   id          String      @id @default(uuid())
@@ -64,6 +74,7 @@ model Order {
   status      OrderStatus @default(OPEN)
   total       Float       @default(0)
   paymentMethod String?
+  maidType    OrderMaidType?
   
   // Relacionamentos
   userId      String
