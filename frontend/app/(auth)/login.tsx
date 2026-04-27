@@ -56,8 +56,8 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.title}>Maid Café</Text>
-          <Text style={styles.subtitle}>Bem-vindo(a) de volta! 🌸</Text>
+          <Text style={styles.title}>MaidInBrasil</Text>
+          <Text style={styles.subtitle}>Bem-vindo(a)🌸</Text>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 

@@ -15,7 +15,7 @@ interface Product {
 
 const API_URL = 'https://maid-cafe-api.onrender.com';
 
-const ProductCard = ({ item, onAdd }: { item: Product; onAdd: (product: Product) => void }) => {
+const ProductCard = ({ item, onAdd, cardWidth }: { item: Product; onAdd: (product: Product) => void; cardWidth: number }) => {
   const [adding, setAdding] = useState(false);
   const isOutOfStock = !item.isAvailable || item.stock <= 0;
 
@@ -31,31 +31,40 @@ const ProductCard = ({ item, onAdd }: { item: Product; onAdd: (product: Product)
   }
 
   return (
-    <View style={[styles.productCard, isOutOfStock && styles.productCardDisabled]}>
+    <View style={[styles.productCard, isOutOfStock && styles.productCardDisabled, { width: cardWidth }]}>
       <View style={styles.imagePlaceholder}>
         {item.imageUrl
           ? <Image source={{ uri: item.imageUrl }} style={styles.image} resizeMode="cover" />
-          : <Text style={{ fontSize: 35 }}>{getEmoji(item.category?.name || '')}</Text>
+          : <Text style={{ fontSize: 45 }}>{getEmoji(item.category?.name || '')}</Text>
         }
+        {/* Etiqueta fofa flutuante para o preço */}
+        <View style={styles.priceTag}>
+          <Text style={styles.productPrice}>
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}
+          </Text>
+        </View>
       </View>
+      
       <View style={styles.infoContainer}>
-        <Text style={styles.productCategory}>{item.category?.name || 'Delícia'}</Text>
+        <Text style={styles.productCategory}>✦ {item.category?.name || 'Delícia'} ✦</Text>
         <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
         <Text style={styles.productDesc} numberOfLines={2}>{item.description}</Text>
-        <Text style={styles.productPrice}>
-          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}
-        </Text>
+        
         {item.stock > 0 && item.isAvailable && (
-          <Text style={styles.stockText}>Restam: {item.stock}</Text>
+          <Text style={styles.stockText}>🎀 Restam apenas: {item.stock}</Text>
         )}
+        
         <TouchableOpacity
           style={[styles.addButton, isOutOfStock && styles.addButtonDisabled]}
           onPress={handlePress}
           disabled={isOutOfStock || adding}
+          activeOpacity={0.7}
         >
           {adding
             ? <ActivityIndicator color="#FFF" size="small" />
-            : <Text style={styles.addButtonText}>{isOutOfStock ? 'Esgotado' : '+ Adicionar'}</Text>
+            : <Text style={styles.addButtonText}>
+                {isOutOfStock ? 'Fugiu! 😿' : 'Eu Quero! ♡'}
+              </Text>
           }
         </TouchableOpacity>
       </View>
@@ -103,10 +112,10 @@ export default function MenuScreen() {
   async function handleAddToCart(product: Product) {
     try {
       await addToCart(product.id, 1);
-      setFeedback(`"${product.name}" adicionado ao carrinho! 🛒`);
+      setFeedback(`Yatta! "${product.name}" na sua mesa! 🪄✨`);
       setTimeout(() => setFeedback(''), 2500);
     } catch (error: any) {
-      setFeedback(error.message || 'Não conseguimos adicionar o pedido.');
+      setFeedback(error.message || 'Ops! Magia falhou, tente de novo. 💦');
       setTimeout(() => setFeedback(''), 3000);
     }
   }
@@ -120,11 +129,17 @@ export default function MenuScreen() {
     });
   }, [products, selectedCategory, search]);
 
+  // Cálculos dinâmicos para a largura do cartão baseada na tela do dispositivo
+  const windowWidth = Dimensions.get('window').width;
+  const numColumns = windowWidth > 600 ? 3 : 2;
+  const cardWidth = (windowWidth - 20) / numColumns - 16;
+
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#FF69B4" />
-        <Text style={{ marginTop: 10, color: '#FF69B4', fontWeight: 'bold' }}>Preparando o Menu Mágico...</Text>
+        <Text style={styles.loadingKaomoji}>(=^･ω･^=)🐾</Text>
+        <ActivityIndicator size="large" color="#FF69B4" style={{ marginVertical: 15 }} />
+        <Text style={styles.loadingText}>Preparando a magia do menu...</Text>
       </View>
     );
   }
@@ -132,14 +147,24 @@ export default function MenuScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Maid Café Menu 🐾</Text>
-        <TextInput
-          style={styles.searchBar}
-          placeholder="Procurar uma delícia..."
-          placeholderTextColor="#FFB6C1"
-          value={search}
-          onChangeText={setSearch}
-        />
+        <Text style={styles.headerTitle}>🎀 MaidInBrasil 🎀</Text>
+        <Text style={styles.subtitle}>Qual o seu pedido?</Text>
+        
+        <View style={styles.searchContainer}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchBar}
+            placeholder="Procurar uma delícia..."
+            placeholderTextColor="#FFB6C1"
+            value={search}
+            onChangeText={setSearch}
+          />
+        </View>
+      </View>
+
+      {/* Ondinhas/Rendinhas imitando o final do cabeçalho */}
+      <View style={styles.laceBorderContainer}>
+         <Text style={styles.laceText}>︶ ིི ྀ⏝ ིི ྀ︶ ིི ྀ⏝ ིི ྀ︶ ིི ྀ⏝ ིི ྀ︶ ིི ྀ⏝ ིི ྀ︶</Text>
       </View>
 
       {feedback ? (
@@ -148,13 +173,13 @@ export default function MenuScreen() {
         </View>
       ) : null}
 
-      <View style={{ height: 60, marginTop: 10 }}>
+      <View style={{ height: 60, marginTop: 5 }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryList}>
           <TouchableOpacity
             style={[styles.categoryBtn, !selectedCategory && styles.categoryBtnActive]}
             onPress={() => setSelectedCategory(null)}
           >
-            <Text style={[styles.categoryText, !selectedCategory && styles.categoryTextActive]}>Tudo</Text>
+            <Text style={[styles.categoryText, !selectedCategory && styles.categoryTextActive]}>Tudo ✨</Text>
           </TouchableOpacity>
           {categories.map(cat => (
             <TouchableOpacity
@@ -162,19 +187,27 @@ export default function MenuScreen() {
               style={[styles.categoryBtn, selectedCategory === cat.id && styles.categoryBtnActive]}
               onPress={() => setSelectedCategory(cat.id)}
             >
-              <Text style={[styles.categoryText, selectedCategory === cat.id && styles.categoryTextActive]}>{cat.name}</Text>
+              <Text style={[styles.categoryText, selectedCategory === cat.id && styles.categoryTextActive]}>
+                {cat.name}
+              </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
 
       <FlatList
+        key={numColumns} // Força a recarga do layout se a tela girar
         data={filteredProducts}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <ProductCard item={item} onAdd={handleAddToCart} />}
-        numColumns={Dimensions.get('window').width > 600 ? 3 : 2}
+        renderItem={({ item }) => <ProductCard item={item} onAdd={handleAddToCart} cardWidth={cardWidth} />}
+        numColumns={numColumns}
         contentContainerStyle={styles.listContainer}
-        ListEmptyComponent={<Text style={styles.emptyText}>Nenhuma delícia encontrada 😿</Text>}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyKaomoji}>(╥﹏╥)</Text>
+            <Text style={styles.emptyText}>Nenhuma delícia encontrada...</Text>
+          </View>
+        }
       />
     </View>
   );
@@ -183,29 +216,52 @@ export default function MenuScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFF0F5' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF0F5' },
-  header: { padding: 20, paddingTop: 40, backgroundColor: '#FFFFFF', borderBottomLeftRadius: 30, borderBottomRightRadius: 30, elevation: 2 },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#FF69B4', textAlign: 'center', marginBottom: 15 },
-  searchBar: { backgroundColor: '#FFF5F7', borderRadius: 15, padding: 12, color: '#8B5A2B', borderWidth: 1, borderColor: '#FFC0CB' },
-  categoryList: { paddingHorizontal: 20, alignItems: 'center', gap: 10 },
-  categoryBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FFC0CB' },
-  categoryBtnActive: { backgroundColor: '#FF69B4', borderColor: '#FF69B4' },
-  categoryText: { color: '#FF69B4', fontWeight: '600' },
+  loadingKaomoji: { fontSize: 30, color: '#FF69B4', marginBottom: 10 },
+  loadingText: { color: '#FF69B4', fontWeight: 'bold', fontSize: 16 },
+  
+  header: { padding: 20, paddingTop: 50, backgroundColor: '#FFFFFF', alignItems: 'center' },
+  headerTitle: { fontSize: 26, fontWeight: '900', color: '#FF69B4', textAlign: 'center' },
+  subtitle: { fontSize: 14, color: '#8B5A2B', fontStyle: 'italic', marginTop: 4, marginBottom: 15 },
+  
+  laceBorderContainer: { alignItems: 'center', backgroundColor: '#FFF0F5', marginTop: -12, zIndex: -1 },
+  laceText: { color: '#FFFFFF', fontSize: 20, letterSpacing: -2 },
+
+  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF5F7', borderRadius: 25, borderWidth: 2, borderColor: '#FFE4E1', paddingHorizontal: 15, width: '100%' },
+  searchIcon: { fontSize: 18, marginRight: 8 },
+  searchBar: { flex: 1, paddingVertical: 12, color: '#8B5A2B', fontSize: 16 },
+  
+  categoryList: { paddingHorizontal: 20, alignItems: 'center', gap: 12 },
+  categoryBtn: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 25, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#FFE4E1', borderStyle: 'dashed' },
+  categoryBtnActive: { backgroundColor: '#FFB6C1', borderColor: '#FF69B4', borderStyle: 'solid' },
+  categoryText: { color: '#FF69B4', fontWeight: '800', fontSize: 14 },
   categoryTextActive: { color: '#FFFFFF' },
-  listContainer: { padding: 10 },
-  emptyText: { textAlign: 'center', color: '#8B5A2B', marginTop: 40, fontSize: 16, fontWeight: '600' },
-  feedbackBar: { backgroundColor: '#FF69B4', paddingVertical: 10, paddingHorizontal: 20 },
-  feedbackText: { color: '#fff', fontWeight: '600', textAlign: 'center', fontSize: 13 },
-  productCard: { flex: 1, backgroundColor: '#FFF', margin: 8, borderRadius: 20, overflow: 'hidden', elevation: 3, shadowColor: '#FFB6C1', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4 },
-  productCardDisabled: { opacity: 0.5 },
-  imagePlaceholder: { width: '100%', height: 120, backgroundColor: '#FFF5F7', justifyContent: 'center', alignItems: 'center' },
+  
+  listContainer: { padding: 10, paddingBottom: 30 },
+  
+  emptyContainer: { alignItems: 'center', marginTop: 60 },
+  emptyKaomoji: { fontSize: 40, color: '#FFB6C1', marginBottom: 10 },
+  emptyText: { textAlign: 'center', color: '#8B5A2B', fontSize: 16, fontWeight: '600' },
+  
+  feedbackBar: { backgroundColor: '#FF69B4', paddingVertical: 12, paddingHorizontal: 20, marginHorizontal: 20, borderRadius: 20, marginTop: 10, elevation: 4 },
+  feedbackText: { color: '#fff', fontWeight: 'bold', textAlign: 'center', fontSize: 14 },
+  
+  // Cartão do Produto (sem o flex: 1 para respeitar a largura matemática)
+  productCard: { backgroundColor: '#FFF', margin: 8, borderRadius: 25, borderWidth: 3, borderColor: '#FFF0F5', overflow: 'hidden', elevation: 2 },
+  productCardDisabled: { opacity: 0.6, backgroundColor: '#F8F8FF' },
+  
+  imagePlaceholder: { width: '100%', height: 130, backgroundColor: '#FFE4E1', justifyContent: 'center', alignItems: 'center', borderBottomWidth: 3, borderBottomColor: '#FFF0F5', borderStyle: 'dashed' },
   image: { width: '100%', height: '100%' },
-  infoContainer: { padding: 12, flex: 1, justifyContent: 'space-between' },
-  productCategory: { fontSize: 10, color: '#FF69B4', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 2 },
-  productName: { color: '#8B5A2B', fontWeight: 'bold', fontSize: 15, marginBottom: 4 },
-  productDesc: { color: '#A0522D', fontSize: 11, marginBottom: 8, opacity: 0.8 },
-  productPrice: { color: '#FF69B4', fontWeight: '800', fontSize: 16 },
-  stockText: { fontSize: 10, color: '#aaa', marginBottom: 4 },
-  addButton: { backgroundColor: '#FF69B4', paddingVertical: 10, borderRadius: 12, marginTop: 10, alignItems: 'center', justifyContent: 'center' },
-  addButtonDisabled: { backgroundColor: '#D3D3D3' },
-  addButtonText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
+  
+  priceTag: { position: 'absolute', bottom: -15, right: 10, backgroundColor: '#FFFFFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 2, borderColor: '#FFB6C1', elevation: 3 },
+  productPrice: { color: '#FF69B4', fontWeight: '900', fontSize: 15 },
+  
+  infoContainer: { padding: 15, paddingTop: 20, flex: 1, justifyContent: 'space-between', alignItems: 'center' },
+  productCategory: { fontSize: 10, color: '#FFB6C1', fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
+  productName: { color: '#8B5A2B', fontWeight: 'bold', fontSize: 16, marginBottom: 4, textAlign: 'center' },
+  productDesc: { color: '#D2B48C', fontSize: 12, marginBottom: 10, textAlign: 'center', lineHeight: 16 },
+  stockText: { fontSize: 11, color: '#FF69B4', fontWeight: '600', marginBottom: 8, backgroundColor: '#FFF5F7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
+  
+  addButton: { backgroundColor: '#FF69B4', paddingVertical: 12, width: '100%', borderRadius: 25, alignItems: 'center', justifyContent: 'center', shadowColor: '#FF69B4', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 5 },
+  addButtonDisabled: { backgroundColor: '#E6E6FA', shadowOpacity: 0 },
+  addButtonText: { color: '#FFFFFF', fontWeight: '900', fontSize: 15, letterSpacing: 0.5 },
 });
