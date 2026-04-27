@@ -1,12 +1,35 @@
 import { useEffect, useState } from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { getMyRole, Role } from '../../services/api';
+import { TouchableOpacity, Alert, Platform } from 'react-native';
+import { getMyRole, Role, logout } from '../../services/api';
 
 export default function TabsLayout() {
   const [role, setRole] = useState<Role | null>(null);
 
-  useEffect(() => { getMyRole().then(setRole); }, []);
+  useEffect(() => { 
+    getMyRole().then(setRole); 
+  }, []);
+
+  const handleLogout = () => {
+    const executeLogout = async () => {
+      try {
+        await logout();
+        router.replace('/(auth)/login');
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Tem certeza que deseja sair, Mestre?')) executeLogout();
+    } else {
+      Alert.alert('Sair do Café', 'Tem certeza que deseja sair?', [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Sair', style: 'destructive', onPress: executeLogout },
+      ]);
+    }
+  };
 
   const isUser = role === 'USER';
   const isStaff = role === 'ADMIN' || role === 'MAID';
@@ -14,7 +37,22 @@ export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
+        headerShown: true,
+        headerTintColor: '#e91e8c', // Cor do título e ícones
+        // A LINHA ABAIXO DEFINE A COR DE FUNDO DO CABEÇALHO:
+        headerStyle: {
+          backgroundColor: '#fff', // Cor branca para combinar com as Tabs
+          borderBottomWidth: 1,
+          borderBottomColor: '#fce4ec',
+        },
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+        headerRight: () => (
+          <TouchableOpacity onPress={handleLogout} style={{ marginRight: 15 }}>
+            <Ionicons name="log-out-outline" size={24} color="#e91e8c" />
+          </TouchableOpacity>
+        ),
         tabBarActiveTintColor: '#e91e8c',
         tabBarInactiveTintColor: '#f48fb1',
         tabBarStyle: {

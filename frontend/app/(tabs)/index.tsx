@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, FlatList, TextInput,
-  TouchableOpacity, ActivityIndicator, Dimensions, ScrollView, Image
+  TouchableOpacity, ActivityIndicator, Dimensions, ScrollView, Image, Platform
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { getToken, logout, addToCart } from '../../services/api'; 
