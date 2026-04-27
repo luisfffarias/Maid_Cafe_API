@@ -4,12 +4,15 @@ import {
   ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
-// import { register } from '../../services/api'; // Descomente no seu projeto
+import { register } from '../../services/api'; // Descomente no seu projeto
 
 export default function RegisterScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  // 1. Novo estado para confirmar a senha
+  const [confirmPassword, setConfirmPassword] = useState('');
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -18,16 +21,42 @@ export default function RegisterScreen() {
     setError('');
     setSuccess('');
     
-    if (!name.trim() || !email.trim() || !password.trim()) {
+    // 2. Verifica se algum campo está vazio
+    if (!name.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
       setError('Preencha todos os campos, por favor! 🐾');
+      return;
+    }
+
+    // 3. Validação de tamanho do nome
+    if (name.trim().length < 3) {
+      setError('O nome precisa ter pelo menos 3 letras.');
+      return;
+    }
+
+    // 4. Validação de formato de e-mail usando Regex
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setError('Por favor, digite um e-mail válido! 😿');
+      return;
+    }
+
+    // 5. Validação de tamanho e segurança da senha
+    if (password.length < 6) {
+      setError('A senha é muito fraca. Use pelo menos 6 caracteres!');
+      return;
+    }
+
+    // 6. Verifica se as senhas são idênticas
+    if (password !== confirmPassword) {
+      setError('As senhas não combinam. Digite com cuidado! 🐾');
       return;
     }
     
     setLoading(true);
     try {
       // Como o default é cliente na API, enviamos apenas os dados básicos
-      // const data = await register(name.trim(), email.trim(), password);
-      // console.log('Cadastro ok:', data);
+      const data = await register(name.trim(), email.trim(), password);
+      console.log('Cadastro ok:', data);
       
       // Simulando o delay da API
       await new Promise(resolve => setTimeout(resolve, 1500)); 
@@ -89,6 +118,17 @@ export default function RegisterScreen() {
               secureTextEntry 
               value={password} 
               onChangeText={setPassword} 
+            />
+
+            {/* Novo Campo: Confirmar Senha */}
+            <Text style={styles.label}>Confirmar Senha</Text>
+            <TextInput 
+              style={styles.input} 
+              placeholder="••••••••" 
+              placeholderTextColor="#FFA6C9"
+              secureTextEntry 
+              value={confirmPassword} 
+              onChangeText={setConfirmPassword} 
             />
 
             <TouchableOpacity 
