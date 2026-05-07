@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AddItemDto } from './dto/add-item.dto';
 import { OrderStatus } from '@prisma/client';
@@ -36,7 +36,7 @@ export class OrdersService {
       const sittingOrder = await this.prisma.order.findFirst({
         where: { 
           userId, 
-          status: { notIn: [OrderStatus.FINISHED, OrderStatus.CANCELED] } 
+          status: { notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELED] } // Alterado FINISHED para DELIVERED com base no enum anterior
         },
         orderBy: { createdAt: 'desc' }
       });
@@ -57,46 +57,19 @@ export class OrdersService {
       });
     }
 
+    const existingItem = await this.prisma.orderItem.findFirst({
+      where: { orderId: openOrder.id, productId },
+    });
+
+    if (existingItem) {
+      currentQuantityInCart = existingItem.quantity;
+    }
+
     if (product.stock < (currentQuantityInCart + quantity)) {
       throw new BadRequestException(`Estoque insuficiente. Restam apenas ${product.stock} unidades.`);
     }
 
     // ✅ Passou pelas travas! Vamos criar/atualizar o pedido e o item
-    if (!openOrder) {
-      // 1. Verifica se o cliente JÁ ESTÁ em uma mesa (pedidos anteriores não finalizados)
-      const sittingOrder = await this.prisma.order.findFirst({
-        where: { 
-          userId, 
-          status: { notIn: ['FINISHED', 'CANCELED'] } // Mantém a mesa se ele ainda estiver comendo
-        },
-        orderBy: { createdAt: 'desc' }
-      });
-
-      // Variável temporária para guardar a mesa escolhida
-      let assignedTable: number;
-
-      if (sittingOrder) {
-        // Se ele já está comendo, herda a mesa que ele já estava!
-        assignedTable = sittingOrder.tableNumber;
-      } else {
-        // Se é um cliente totalmente novo, O ROUND ROBIN ESCOLHE A MESA AQUI!
-        assignedTable = await this.getNextAvailableTable(); 
-      }
-
-      // 2. Agora sim, criamos o carrinho passando a mesa que o backend calculou
-      openOrder = await this.prisma.order.create({
-        data: { 
-          userId, 
-          tableNumber: assignedTable, // <-- Olha o Prisma recebendo o número correto aqui!
-          status: 'OPEN' // (Se você usar o Enum, troque para OrderStatus.OPEN)
-        },
-      });
-    }
-
-    const existingItem = await this.prisma.orderItem.findFirst({
-      where: { orderId: openOrder.id, productId },
-    });
-
     if (existingItem) {
       await this.prisma.orderItem.update({
         where: { id: existingItem.id },
@@ -138,7 +111,7 @@ export class OrdersService {
         id: itemId,
         order: { userId, status: OrderStatus.OPEN },
       },
-      include: { product: true } // Precisamos do produto para verificar o estoque!
+      include: { product: true } 
     });
 
     if (!item) {
@@ -183,7 +156,7 @@ export class OrdersService {
   // ====================================================================
   // 5. FINALIZAR PEDIDO (CHECKOUT) E BAIXAR ESTOQUE
   // ====================================================================
-  async checkout(userId: string, maidType?: string) { // 👈 Recebe o maidType aqui
+  async checkout(userId: string, maidType?: string) { 
     const order = await this.prisma.order.findFirst({
       where: { userId, status: OrderStatus.OPEN },
       include: { items: true },
@@ -213,7 +186,7 @@ export class OrdersService {
       where: { id: order.id },
       data: { 
         status: OrderStatus.PENDING,
-        maidType: maidType as any // 👈 Salva a personalidade escolhida no banco!
+        maidType: maidType as any 
       },
     });
   }
@@ -274,6 +247,52 @@ export class OrdersService {
   }
 
   // ====================================================================
+  // 9. CANCELAMENTO MESTRE (CLIENTE OU STAFF)
+  // ====================================================================
+  async cancelOrder(orderId: string, userId: string, userRole: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true }, 
+    });
+
+    if (!order) {
+      throw new NotFoundException('Pedido não encontrado.');
+    }
+
+    // Regras de Segurança: Diferenciar ações do Cliente vs Ações da Equipe
+    if (userRole === 'USER') {
+      // 1. O pedido pertence a este usuário?
+      if (order.userId !== userId) {
+        throw new ForbiddenException('Você só pode cancelar os seus próprios pedidos.');
+      }
+
+      // 2. Só pode cancelar se estiver Aguardando (PENDING)
+      if (order.status !== OrderStatus.PENDING) {
+        throw new BadRequestException('O pedido já está a ser preparado ou foi finalizado. Peça ajuda a uma Maid.');
+      }
+    }
+
+    // Se chegou aqui, ou é o dono (com status PENDING) ou é a equipe limpando a mesa.
+    // Só devolvemos o estoque se o pedido NÃO tiver sido entregue.
+    if (order.status !== OrderStatus.DELIVERED) {
+      for (const item of order.items) {
+        await this.prisma.product.update({
+          where: { id: item.productId },
+          data: {
+            stock: { increment: item.quantity } 
+          }
+        });
+      }
+    }
+
+    // Atualiza o pedido para cancelado
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.CANCELED }, 
+    });
+  }
+
+  // ====================================================================
   // FUNÇÃO AUXILIAR: RECALCULAR TOTAL
   // ====================================================================
   private async updateOrderTotal(orderId: string) {
@@ -290,71 +309,25 @@ export class OrdersService {
     });
   }
 
-
-// ====================================================================
-  // 9. CLIENTE: CANCELAR O PRÓPRIO PEDIDO
-  // ====================================================================
-  async cancelUserOrder(orderId: string, userId: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      include: { items: true }, // Precisamos dos itens para devolver ao estoque
-    });
-
-    if (!order) {
-      throw new NotFoundException('Pedido não encontrado.');
-    }
-
-    // Regra de Segurança 1: O pedido pertence a este usuário?
-    if (order.userId !== userId) {
-      throw new ForbiddenException('Você só pode cancelar os seus próprios pedidos.');
-    }
-
-    // Regra de Segurança 2: Só pode cancelar se estiver Aguardando (PENDING)
-    if (order.status !== OrderStatus.PENDING) {
-      throw new BadRequestException('Muito tarde! O pedido já está a ser preparado ou foi finalizado.');
-    }
-
-    // Devolve os itens ao estoque!
-    for (const item of order.items) {
-      await this.prisma.product.update({
-        where: { id: item.productId },
-        data: {
-          stock: { increment: item.quantity } 
-        }
-      });
-    }
-
-    // Atualiza o pedido para cancelado
-    return this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: OrderStatus.CANCELED }, // Atenção: Verifique se no seu enum é CANCELED ou CANCELLED
-    });
-  }
-
   // ====================================================================
   // FUNÇÃO AUXILIAR: ROUND ROBIN DE MESAS
   // ====================================================================
   private async getNextAvailableTable(): Promise<number> {
-    const TOTAL_TABLES = 10; // Defina quantas mesas existem no Maid Café
+    const TOTAL_TABLES = 10; 
 
-    // 1. Descobre quais mesas estão ocupadas agora (qualquer pedido que NÃO seja FINISHED ou CANCELED)
     const activeOrders = await this.prisma.order.findMany({
       where: {
-        status: { notIn: [OrderStatus.FINISHED, OrderStatus.CANCELED] },
+        status: { notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELED] }, // Alterado FINISHED para DELIVERED
       },
       select: { tableNumber: true },
     });
     
-    // 👇 CORREÇÃO AQUI: Cria um array com os números ÚNICOS das mesas ocupadas.
-    // O Set garante que, se a Mesa 1 tiver 10 pedidos ativos, ela conte como apenas 1 mesa ocupada.
     const occupiedTables = [...new Set(activeOrders.map(o => o.tableNumber))];
 
-    // Se a casa estiver cheia, barra o sistema
     if (occupiedTables.length >= TOTAL_TABLES) {
       throw new BadRequestException('Todas as mesas estão ocupadas no momento. Por favor, aguarde.');
     }
 
-    // 2. Descobre qual foi a ÚLTIMA mesa a ser designada no restaurante
     const lastOrder = await this.prisma.order.findFirst({
       orderBy: { createdAt: 'desc' },
       select: { tableNumber: true },
@@ -362,12 +335,10 @@ export class OrdersService {
 
     let startTable = lastOrder ? lastOrder.tableNumber : 0;
 
-    // 3. ROUND ROBIN: Tenta a próxima mesa, girando em loop se chegar no máximo
     for (let i = 1; i <= TOTAL_TABLES; i++) {
       let nextTable = (startTable + i) % TOTAL_TABLES;
-      if (nextTable === 0) nextTable = TOTAL_TABLES; // Para evitar a "Mesa 0"
+      if (nextTable === 0) nextTable = TOTAL_TABLES; 
 
-      // Se essa mesa não estiver no array de ocupadas, achamos a vencedora!
       if (!occupiedTables.includes(nextTable)) {
         return nextTable;
       }
@@ -375,5 +346,4 @@ export class OrdersService {
 
     throw new Error('Erro ao calcular mesa disponível.');
   }
-  
 }

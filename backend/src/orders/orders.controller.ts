@@ -3,11 +3,11 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
 import { AddItemDto } from './dto/add-item.dto';
 import { UpdateItemQuantityDto } from './dto/update-item-quantity.dto';
-import { UpdateOrderStatusDto } from './dto/update-order-status.dto'; // <-- Novo DTO
+import { UpdateOrderStatusDto } from './dto/update-order-status.dto'; 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard'; // <-- Importe o RolesGuard
-import { Roles } from '../auth/decorators/roles.decorator'; // <-- Importe o Decorator
-import { Role } from '@prisma/client'; // <-- Importe o Enum de cargos
+import { RolesGuard } from '../auth/guards/roles.guard'; 
+import { Roles } from '../auth/decorators/roles.decorator'; 
+import { Role } from '@prisma/client'; 
 
 @ApiTags('Pedidos / Carrinho')
 @ApiBearerAuth()
@@ -51,19 +51,18 @@ export class OrdersController {
 
   @ApiOperation({ summary: 'Finalizar pedido (Enviar para a cozinha)' })
   @Post('checkout')
-  checkout(@Req() req, @Body('maidType') maidType?: string) { // 👈 Adicionado o @Body
+  checkout(@Req() req, @Body('maidType') maidType?: string) {
     return this.ordersService.checkout(req.user.userId, maidType);
   }
 
-
-@ApiOperation({ summary: 'Ver meu histórico de pedidos (Tudo exceto o carrinho atual)' })
+  @ApiOperation({ summary: 'Ver meu histórico de pedidos (Tudo exceto o carrinho atual)' })
   @Get('history')
   getUserHistory(@Req() req) {
     // Usando req.user.userId conforme configurado na sua Strategy
     return this.ordersService.getUserHistory(req.user.userId);
   }
 
-@ApiOperation({ summary: 'Staff: Ver fila de pedidos da cozinha' })
+  @ApiOperation({ summary: 'Staff: Ver fila de pedidos da cozinha' })
   @Roles(Role.ADMIN, Role.MAID) // Apenas Admin e Maids acessam!
   @Get('queue')
   getQueue() {
@@ -79,15 +78,15 @@ export class OrdersController {
   ) {
     return this.ordersService.updateStatus(id, updateOrderStatusDto.status);
   }
-@ApiOperation({ summary: 'Cliente: Cancelar próprio pedido pendente' })
+
+  // 👇 Rota Atualizada para o Cancelamento Mestre!
+  @ApiOperation({ summary: 'Cancelar pedido (Cliente ou Staff)' })
   @Patch(':id/cancel')
-  cancelMyOrder(
+  cancelOrder(
     @Param('id') id: string, 
     @Req() req
   ) {
-    // req.user.userId vem do seu JWT (AuthGuard)
-    return this.ordersService.cancelUserOrder(id, req.user.userId);
+    // req.user.userId e req.user.role vêm do seu JWT (AuthGuard)
+    return this.ordersService.cancelOrder(id, req.user.userId, req.user.role);
   }
-
-}  
-
+}

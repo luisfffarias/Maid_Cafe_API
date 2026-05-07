@@ -167,3 +167,13 @@ export async function updateProductStock(productId: string, stock: number) {
   if (!res.ok) { const data = await res.json(); throw new Error(data.message || 'Erro ao atualizar o estoque.'); }
   return res.json();
 }
+
+export async function cancelMyOrder(orderId: string): Promise<Order> {
+  const res = await fetch(`${BASE_URL}/orders/${orderId}/cancel`, { 
+    method: 'PATCH', 
+    headers: await authHeaders() 
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Erro ao cancelar o pedido.');
+  return data;
+}

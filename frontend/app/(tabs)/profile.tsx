@@ -6,15 +6,25 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, useFocusEffect } from 'expo-router';
-import { logout, getToken, decodeToken, updateUserName, Order, getUserHistory } from '../../services/api';
+import { logout, getToken, decodeToken, updateUserName, Order, getUserHistory, cancelMyOrder } from '../../services/api';
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: 'Aguardando', PREPARING: 'Preparando',
   DELIVERED: 'Entregue', CANCELED: 'Cancelado', OPEN: 'Aberto',
 };
+
 const STATUS_COLOR: Record<string, string> = {
   PENDING: '#ff9800', PREPARING: '#2196f3',
   DELIVERED: '#4caf50', CANCELED: '#f44336', OPEN: '#9e9e9e',
+};
+
+// Dicionário para deixar a exibição da Maid mais fofa
+const MAID_LABELS: Record<string, string> = {
+  DEREDERE: '🌸 Deredere',
+  TSUNDERE: '😾 Tsundere',
+  DANDERE: '🥺 Dandere',
+  ONEESAN: '☕ Oneesan',
+  KUUDERE: '🧊 Kuudere',
 };
 
 export default function ProfileScreen() {
@@ -27,6 +37,7 @@ export default function ProfileScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [savingName, setSavingName] = useState(false);
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
 
   async function loadProfile() {
     const token = await getToken();
@@ -38,7 +49,6 @@ export default function ProfileScreen() {
       setUserId(decoded.sub);
     }
     
-    // Carrega dados persistidos localmente
     const savedName = await AsyncStorage.getItem('user_name');
     const savedPhoto = await AsyncStorage.getItem('user_photo');
     
@@ -50,7 +60,9 @@ export default function ProfileScreen() {
     setLoadingOrders(true);
     try {
       const data = await getUserHistory();
-      setOrders(data);
+      // Ordena para mostrar os mais recentes primeiro
+      const sortedData = data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setOrders(sortedData);
     } catch (e) {
       console.error(e);
     } finally {
@@ -98,8 +110,6 @@ export default function ProfileScreen() {
   async function executeLogout() {
     try {
       await logout();
-      // IMPORTANTE: Ao invés de AsyncStorage.clear() global, 
-      // certifique-se que sua função 'logout' no service apenas remova o token.
       router.replace('/(auth)/login');
     } catch (e) { console.error(e); }
   }
@@ -113,6 +123,29 @@ export default function ProfileScreen() {
         { text: 'Sair', style: 'destructive', onPress: executeLogout },
       ]);
     }
+  }
+
+  // --- Função para Cancelar o Pedido ---
+  function handleCancelOrder(orderId: string) {
+    Alert.alert('Cancelar Pedido', 'Deseja mesmo cancelar este pedido?', [
+      { text: 'Não', style: 'cancel' },
+      { 
+        text: 'Sim, Cancelar', 
+        style: 'destructive', 
+        onPress: async () => {
+          setCancelingId(orderId);
+          try {
+            await cancelMyOrder(orderId);
+            await loadOrders(); // Recarrega a lista para atualizar o status
+            Alert.alert('Cancelado', 'O seu pedido foi cancelado com sucesso.');
+          } catch (e: any) {
+            Alert.alert('Erro ao cancelar', e.message);
+          } finally {
+            setCancelingId(null);
+          }
+        }
+      },
+    ]);
   }
 
   const ROLE_LABEL: Record<string, string> = { USER: 'Cliente', MAID: 'Maid', ADMIN: 'Admin' };
@@ -177,17 +210,52 @@ export default function ProfileScreen() {
                 </Text>
               </View>
             </View>
+
+            {/* Exibição da Personalidade da Maid */}
+            {order.maidType && (
+              <View style={styles.maidInfoBadge}>
+                <Text style={styles.maidInfoText}>
+                  Atendimento: {MAID_LABELS[order.maidType] || order.maidType}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.itemsDivider} />
+
             {order.items?.map((item) => (
               <Text key={item.id} style={styles.orderItem}>
                 • {item.quantity}x {item.product?.name}
               </Text>
             ))}
-            <Text style={styles.orderTotal}>
-              Total: R$ {order.total.toFixed(2).replace('.', ',')}
-            </Text>
+            
+            <View style={styles.orderFooter}>
+              <Text style={styles.orderTotal}>
+                Total: R$ {order.total.toFixed(2).replace('.', ',')}
+              </Text>
+
+              {/* Botão de Cancelar - Só aparece se estiver PENDING */}
+              {order.status === 'PENDING' && (
+                <TouchableOpacity 
+                  style={styles.cancelOrderBtn} 
+                  onPress={() => handleCancelOrder(order.id)}
+                  disabled={cancelingId === order.id}
+                >
+                  {cancelingId === order.id ? (
+                    <ActivityIndicator color="#f44336" size="small" />
+                  ) : (
+                    <Text style={styles.cancelOrderBtnText}>Cancelar</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         ))
       )}
+
+      {/* Botão de Sair adicionado de volta à interface */}
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <Text style={styles.logoutText}>Sair do Café</Text>
+      </TouchableOpacity>
 
       <View style={{ height: 40 }} />
     </ScrollView>
@@ -216,13 +284,24 @@ const styles = StyleSheet.create({
   emptyOrders: { alignItems: 'center', paddingVertical: 24 },
   emptyEmoji: { fontSize: 36, marginBottom: 8 },
   emptyText: { color: '#f48fb1', fontSize: 14 },
+  
   orderCard: { width: '100%', backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#fce4ec', elevation: 2 },
   orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   orderTable: { fontSize: 16, fontWeight: '800', color: '#8B5A2B' },
   statusBadge: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
   statusText: { fontSize: 12, fontWeight: '700' },
+  
+  maidInfoBadge: { backgroundColor: '#fff0f6', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, alignSelf: 'flex-start', marginBottom: 8 },
+  maidInfoText: { color: '#c2185b', fontSize: 12, fontWeight: '600' },
+  itemsDivider: { height: 1, backgroundColor: '#fce4ec', marginVertical: 8 },
+  
   orderItem: { fontSize: 13, color: '#5D4037', marginBottom: 3 },
-  orderTotal: { fontSize: 14, fontWeight: '800', color: '#e91e8c', marginTop: 8 },
+  
+  orderFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
+  orderTotal: { fontSize: 15, fontWeight: '900', color: '#e91e8c' },
+  cancelOrderBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#f44336' },
+  cancelOrderBtnText: { color: '#f44336', fontSize: 12, fontWeight: 'bold' },
+  
   logoutButton: { backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#FF69B4', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 30, width: '100%', alignItems: 'center', marginTop: 24 },
   logoutText: { color: '#FF69B4', fontWeight: 'bold', fontSize: 16 },
 });
