@@ -51,8 +51,8 @@ export class OrdersController {
 
   @ApiOperation({ summary: 'Finalizar pedido (Enviar para a cozinha)' })
   @Post('checkout')
-  checkout(@Req() req) {
-    return this.ordersService.checkout(req.user.userId);
+  checkout(@Req() req, @Body('maidType') maidType?: string) { // 👈 Adicionado o @Body
+    return this.ordersService.checkout(req.user.userId, maidType);
   }
 
 

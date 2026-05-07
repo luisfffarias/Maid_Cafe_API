@@ -64,7 +64,6 @@ enum OrderMaidType {
   DANDERE // Timida e silenciosa
   ONEESAN // Madura e protetora
   KUUDERE  // Fria e inexpressiva
-  FINISHED  // Pedido Concluido 
 }
 
 

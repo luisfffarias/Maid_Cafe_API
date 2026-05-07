@@ -183,7 +183,7 @@ export class OrdersService {
   // ====================================================================
   // 5. FINALIZAR PEDIDO (CHECKOUT) E BAIXAR ESTOQUE
   // ====================================================================
-  async checkout(userId: string) {
+  async checkout(userId: string, maidType?: string) { // 👈 Recebe o maidType aqui
     const order = await this.prisma.order.findFirst({
       where: { userId, status: OrderStatus.OPEN },
       include: { items: true },
@@ -211,7 +211,10 @@ export class OrdersService {
 
     return this.prisma.order.update({
       where: { id: order.id },
-      data: { status: OrderStatus.PENDING },
+      data: { 
+        status: OrderStatus.PENDING,
+        maidType: maidType as any // 👈 Salva a personalidade escolhida no banco!
+      },
     });
   }
 
