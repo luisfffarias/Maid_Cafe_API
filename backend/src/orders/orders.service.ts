@@ -290,6 +290,47 @@ export class OrdersService {
     });
   }
 
+
+// ====================================================================
+  // 9. CLIENTE: CANCELAR O PRÓPRIO PEDIDO
+  // ====================================================================
+  async cancelUserOrder(orderId: string, userId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true }, // Precisamos dos itens para devolver ao estoque
+    });
+
+    if (!order) {
+      throw new NotFoundException('Pedido não encontrado.');
+    }
+
+    // Regra de Segurança 1: O pedido pertence a este usuário?
+    if (order.userId !== userId) {
+      throw new ForbiddenException('Você só pode cancelar os seus próprios pedidos.');
+    }
+
+    // Regra de Segurança 2: Só pode cancelar se estiver Aguardando (PENDING)
+    if (order.status !== OrderStatus.PENDING) {
+      throw new BadRequestException('Muito tarde! O pedido já está a ser preparado ou foi finalizado.');
+    }
+
+    // Devolve os itens ao estoque!
+    for (const item of order.items) {
+      await this.prisma.product.update({
+        where: { id: item.productId },
+        data: {
+          stock: { increment: item.quantity } 
+        }
+      });
+    }
+
+    // Atualiza o pedido para cancelado
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.CANCELED }, // Atenção: Verifique se no seu enum é CANCELED ou CANCELLED
+    });
+  }
+
   // ====================================================================
   // FUNÇÃO AUXILIAR: ROUND ROBIN DE MESAS
   // ====================================================================
@@ -334,4 +375,5 @@ export class OrdersService {
 
     throw new Error('Erro ao calcular mesa disponível.');
   }
+  
 }

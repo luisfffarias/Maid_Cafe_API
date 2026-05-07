@@ -79,4 +79,15 @@ export class OrdersController {
   ) {
     return this.ordersService.updateStatus(id, updateOrderStatusDto.status);
   }
+@ApiOperation({ summary: 'Cliente: Cancelar próprio pedido pendente' })
+  @Patch(':id/cancel')
+  cancelMyOrder(
+    @Param('id') id: string, 
+    @Req() req
+  ) {
+    // req.user.userId vem do seu JWT (AuthGuard)
+    return this.ordersService.cancelUserOrder(id, req.user.userId);
+  }
+
 }  
+

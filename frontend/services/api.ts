@@ -128,8 +128,14 @@ export async function removeCartItem(itemId: string): Promise<void> {
   if (!res.ok) { const data = await res.json(); throw new Error(data.message || 'Erro ao remover item.'); }
 }
 
-export async function checkout(): Promise<Order> {
-  const res = await fetch(`${BASE_URL}/orders/checkout`, { method: 'POST', headers: await authHeaders() });
+export async function checkout(maidType?: string): Promise<Order> {
+  const res = await fetch(`${BASE_URL}/orders/checkout`, { 
+    method: 'POST', 
+    headers: await authHeaders(),
+    // Se o cliente escolheu uma Maid, enviamos no body. Se não, enviamos vazio.
+    body: JSON.stringify(maidType ? { maidType } : {})
+  });
+  
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Erro ao finalizar pedido.');
   return data;

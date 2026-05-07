@@ -6,6 +6,18 @@ import {
 import { useFocusEffect } from 'expo-router';
 import { getCart, updateCartItem, removeCartItem, checkout, Order } from '../../services/api';
 
+
+// --- Configuração das Personalidades com Imagens Locais ---
+type MaidType = 'DEREDERE' | 'TSUNDERE' | 'DANDERE' | 'ONEESAN' | 'KUUDERE';
+
+const MAID_PERSONALITIES: { id: MaidType, label: string, image: any, desc: string, color: string }[] = [
+  { id: 'DEREDERE', label: 'Deredere', image: require('../../assets/images/1.png'), desc: 'Sempre sorrindo e cheia de alegria!', color: '#FFB6C1' }, 
+  { id: 'TSUNDERE', label: 'Tsundere', image: require('../../assets/images/2.png'), desc: 'Pode parecer brava, mas é fofa!', color: '#FFDAB9' }, 
+  { id: 'DANDERE', label: 'Dandere', image: require('../../assets/images/3.png'), desc: 'Discreta e reservada, um amorzinho!', color: '#ADD8E6' }, 
+  { id: 'ONEESAN', label: 'Oneesan', image: require('../../assets/images/4.png'), desc: 'Como uma irmã mais velha, carinhosa!', color: '#FFE4B5' }, 
+  { id: 'KUUDERE', label: 'Kuudere', image: require('../../assets/images/5.png'), desc: 'Focada e serena, mas muito profissional!', color: '#E6E6FA' }, 
+];
+
 export default function CartScreen() {
   const [cart, setCart] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -14,6 +26,8 @@ export default function CartScreen() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  
+  const [selectedMaid, setSelectedMaid] = useState<MaidType | null>(null);
 
   async function loadCart() {
     try {
@@ -59,8 +73,9 @@ export default function CartScreen() {
     setCheckoutLoading(true);
     setError('');
     try {
-      await checkout();
+      await checkout(selectedMaid || undefined);
       setCart(null);
+      setSelectedMaid(null);
       setSuccess('Pedido enviado para a cozinha! 🎀');
     } catch (err: any) {
       setError(err.message);
@@ -114,10 +129,11 @@ export default function CartScreen() {
             contentContainerStyle={styles.scroll}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadCart(); }} tintColor="#e91e8c" />}
           >
+            {/* Lista de Itens do Carrinho */}
             {cart!.items.map((item) => (
               <View key={item.id} style={styles.itemCard}>
                 <Image 
-                  source={{ uri: item.product.imageUrl }} 
+                  source={{ uri: item.product.imageUrl || 'https://via.placeholder.com/60' }} 
                   style={styles.itemImage} 
                 />
                 <View style={styles.itemInfo}>
@@ -147,6 +163,63 @@ export default function CartScreen() {
                 </View>
               </View>
             ))}
+
+            {/* SEÇÃO VISUAL: Escolha da Maid */}
+            <View style={styles.maidSection}>
+              <Text style={styles.maidSectionTitle}>MAID CAFE - SELEÇÃO DE ATENDIMENTO 🎀</Text>
+              <Text style={styles.maidSectionSub}>Quem vai servir a sua mesa hoje? (Opcional)</Text>
+              
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                contentContainerStyle={styles.maidList}
+                snapToInterval={170} // Ajuda na navegação horizontal suave
+                decelerationRate="fast"
+              >
+                {MAID_PERSONALITIES.map((maid) => {
+                  const isSelected = selectedMaid === maid.id;
+                  return (
+                    <TouchableOpacity 
+                      key={maid.id} 
+                      style={[
+                        styles.maidCard, 
+                        { borderColor: maid.color },
+                        isSelected && styles.maidCardActive
+                      ]}
+                      onPress={() => setSelectedMaid(isSelected ? null : maid.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Image 
+                        source={maid.image} // 👈 Agora usa diretamente o objeto importado via require()
+                        style={styles.maidAvatar}
+                        resizeMode="cover"
+                      />
+                      <View style={[styles.maidLabelContainer, { backgroundColor: maid.color }]}>
+                        <Text style={styles.maidLabel}>{maid.label}</Text>
+                      </View>
+                      
+                      <View style={styles.maidTextContainer}>
+                         <Text style={styles.maidDesc}>{maid.desc}</Text>
+                      </View>
+                      
+                      {/* Botão Visual de Seleção dentro do Card */}
+                      <View style={[
+                        styles.selectBadge, 
+                        isSelected ? { backgroundColor: '#e91e8c' } : { backgroundColor: '#fce4ec' }
+                      ]}>
+                         <Text style={[
+                           styles.selectBadgeText, 
+                           isSelected ? { color: '#fff' } : { color: '#c2185b' }
+                         ]}>
+                           {isSelected ? 'SELECIONADA' : 'SELECIONAR MAID'}
+                         </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
             <View style={{ height: 120 }} />
           </ScrollView>
 
@@ -190,6 +263,7 @@ const styles = StyleSheet.create({
   backBtn: { marginTop: 24, backgroundColor: '#e91e8c', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 28 },
   backBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   scroll: { padding: 16 },
+  
   itemCard: {
     backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -205,6 +279,78 @@ const styles = StyleSheet.create({
   qtyBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#fce4ec', alignItems: 'center', justifyContent: 'center' },
   qtyBtnText: { fontSize: 18, color: '#c2185b', fontWeight: '700', lineHeight: 22 },
   qtyNum: { fontSize: 16, fontWeight: '700', color: '#2d1b2e', minWidth: 20, textAlign: 'center' },
+  
+  // --- Estilos Refinados da Seção de Personalidade (Inspirado no Protótipo) ---
+  maidSection: { marginTop: 24, marginBottom: 20 },
+  maidSectionTitle: { fontSize: 16, fontWeight: '900', color: '#c2185b', marginBottom: 4, textAlign: 'center', textTransform: 'uppercase' },
+  maidSectionSub: { fontSize: 12, color: '#f48fb1', marginBottom: 16, textAlign: 'center' },
+  maidList: { gap: 16, paddingBottom: 10, paddingHorizontal: 8 },
+  
+  maidCard: { 
+    backgroundColor: '#fff', 
+    borderWidth: 3, 
+    borderRadius: 20, 
+    width: 160, 
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    overflow: 'hidden', // Importante para a imagem não vazar os cantos
+  },
+  maidCardActive: { 
+    transform: [{ scale: 1.05 }],
+    elevation: 6,
+    shadowOpacity: 0.3,
+  },
+  maidAvatar: {
+    width: '100%',
+    height: 140,
+    backgroundColor: '#f5f5f5', // Cor de fundo caso a imagem demore a carregar
+  },
+  maidLabelContainer: {
+    width: '100%',
+    paddingVertical: 6,
+    alignItems: 'center',
+    borderTopWidth: 2,
+    borderBottomWidth: 2,
+    borderColor: '#fff',
+  },
+  maidLabel: { 
+    fontSize: 16, 
+    fontWeight: '900', 
+    color: '#fff', 
+    textTransform: 'uppercase',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  maidTextContainer: {
+    padding: 12,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  maidDesc: { 
+    fontSize: 12, 
+    color: '#5D4037', 
+    textAlign: 'center',
+    fontWeight: '500',
+    lineHeight: 16,
+  },
+  selectBadge: {
+    width: '80%',
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: '#fff', padding: 20, borderTopWidth: 1, borderTopColor: '#fce4ec',
