@@ -168,12 +168,30 @@ export async function updateProductStock(productId: string, stock: number) {
   return res.json();
 }
 
+
+
+// Cancelar o próprio pedido (Cliente) ou Limpar Mesa (Staff)
 export async function cancelMyOrder(orderId: string): Promise<Order> {
-  const res = await fetch(`${BASE_URL}/orders/${orderId}/cancel`, { 
-    method: 'PATCH', 
-    headers: await authHeaders() 
+  const token = await getToken();
+  const res = await fetch(`${BASE_URL}/orders/${orderId}/cancel`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    }
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Erro ao cancelar o pedido.');
-  return data;
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || 'Erro ao cancelar o pedido.');
+  }
+  return res.json();
+}
+
+export async function logoutCleanup(): Promise<void> {
+  const res = await fetch(`${BASE_URL}/orders/logout-cleanup`, {
+    method: 'POST',
+    headers: await authHeaders(),
+  });
+  if (!res.ok) throw new Error('Erro ao limpar mesa.');
 }

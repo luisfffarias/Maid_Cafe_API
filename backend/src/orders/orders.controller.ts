@@ -89,4 +89,10 @@ export class OrdersController {
     // req.user.userId e req.user.role vêm do seu JWT (AuthGuard)
     return this.ordersService.cancelOrder(id, req.user.userId, req.user.role);
   }
+
+  @ApiOperation({ summary: 'Limpar mesa e pedidos ao fazer logout' })
+  @Post('logout-cleanup')
+  logoutCleanup(@Req() req) {
+    return this.ordersService.logoutCleanup(req.user.userId);
+  }
 }

@@ -125,27 +125,48 @@ export default function ProfileScreen() {
     }
   }
 
-  // --- Função para Cancelar o Pedido ---
+  // --- Função para Cancelar o Pedido (Corrigida para WEB e Mobile) ---
   function handleCancelOrder(orderId: string) {
-    Alert.alert('Cancelar Pedido', 'Deseja mesmo cancelar este pedido?', [
-      { text: 'Não', style: 'cancel' },
-      { 
-        text: 'Sim, Cancelar', 
-        style: 'destructive', 
-        onPress: async () => {
-          setCancelingId(orderId);
-          try {
-            await cancelMyOrder(orderId);
-            await loadOrders(); // Recarrega a lista para atualizar o status
-            Alert.alert('Cancelado', 'O seu pedido foi cancelado com sucesso.');
-          } catch (e: any) {
-            Alert.alert('Erro ao cancelar', e.message);
-          } finally {
-            setCancelingId(null);
-          }
+    // 1. Isolamos a lógica de cancelar numa função
+    const executeCancel = async () => {
+      setCancelingId(orderId);
+      try {
+        await cancelMyOrder(orderId);
+        await loadOrders(); // Recarrega a lista para atualizar o status
+        
+        // Alerta de sucesso também precisa respeitar a plataforma
+        if (Platform.OS === 'web') {
+          window.alert('Cancelado! O seu pedido foi cancelado com sucesso.');
+        } else {
+          Alert.alert('Cancelado', 'O seu pedido foi cancelado com sucesso.');
         }
-      },
-    ]);
+      } catch (e: any) {
+        if (Platform.OS === 'web') {
+          window.alert('Erro ao cancelar: ' + e.message);
+        } else {
+          Alert.alert('Erro ao cancelar', e.message);
+        }
+      } finally {
+        setCancelingId(null);
+      }
+    };
+
+    // 2. Verificamos onde o app está a rodar para mostrar o Pop-up correto
+    if (Platform.OS === 'web') {
+      const confirmou = window.confirm('Deseja mesmo cancelar este pedido?');
+      if (confirmou) {
+        executeCancel();
+      }
+    } else {
+      Alert.alert('Cancelar Pedido', 'Deseja mesmo cancelar este pedido?', [
+        { text: 'Não', style: 'cancel' },
+        { 
+          text: 'Sim, Cancelar', 
+          style: 'destructive', 
+          onPress: executeCancel 
+        },
+      ]);
+    }
   }
 
   const ROLE_LABEL: Record<string, string> = { USER: 'Cliente', MAID: 'Maid', ADMIN: 'Admin' };

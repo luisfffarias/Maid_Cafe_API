@@ -346,4 +346,43 @@ export class OrdersService {
 
     throw new Error('Erro ao calcular mesa disponível.');
   }
+
+// ====================================================================
+  // 10. LIMPEZA DE LOGOUT (VERIFICAÇÃO DUPLA)
+  // ====================================================================
+  async logoutCleanup(userId: string) {
+    const activeOrders = await this.prisma.order.findMany({
+      where: {
+        userId,
+        status: { in: [OrderStatus.PENDING, OrderStatus.PREPARING, OrderStatus.DELIVERED] },
+      },
+      include: { items: true },
+    });
+
+    for (const order of activeOrders) {
+      // REGRA: Se NÃO foi entregue na mesa (está PENDING ou PREPARING) -> CANCELA!
+      if (order.status !== OrderStatus.DELIVERED) {
+        // Devolve os itens ao estoque
+        for (const item of order.items) {
+          await this.prisma.product.update({
+            where: { id: item.productId },
+            data: { stock: { increment: item.quantity } },
+          });
+        }
+        // Atualiza o status para cancelado
+        await this.prisma.order.update({
+          where: { id: order.id },
+          data: { status: OrderStatus.CANCELED },
+        });
+      } else {
+        // REGRA: Se já foi entregue (DELIVERED) -> FINALIZA para liberar a mesa!
+        await this.prisma.order.update({
+          where: { id: order.id },
+          data: { status: OrderStatus.FINISHED },
+        });
+      }
+    }
+    
+    return { message: 'Mesa liberada e pedidos sincronizados com sucesso!' };
+  }
 }

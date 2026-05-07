@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Tabs, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TouchableOpacity, Alert, Platform } from 'react-native';
-import { getMyRole, Role, logout } from '../../services/api';
+// 👇 Não se esqueça de importar o getUserHistory e o cancelMyOrder
+import { getMyRole, Role, logout, getUserHistory, cancelMyOrder } from '../../services/api';
 
 export default function TabsLayout() {
   const [role, setRole] = useState<Role | null>(null);
@@ -12,24 +13,31 @@ export default function TabsLayout() {
   }, []);
 
   const handleLogout = () => {
-    const executeLogout = async () => {
-      try {
-        await logout();
-        router.replace('/(auth)/login');
-      } catch (e) {
-        console.error(e);
+  const executeLogout = async () => {
+    try {
+      if (role === 'USER') {
+        // Faz a verificação dupla e limpeza no servidor
+        await logoutCleanup(); 
       }
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm('Tem certeza que deseja sair, Mestre?')) executeLogout();
-    } else {
-      Alert.alert('Sair do Café', 'Tem certeza que deseja sair?', [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Sair', style: 'destructive', onPress: executeLogout },
-      ]);
+      await logout();
+      router.replace('/(auth)/login');
+    } catch (e) {
+      console.error('Erro ao sair:', e);
+      // Mesmo com erro, fazemos o logout local por segurança
+      await logout();
+      router.replace('/(auth)/login');
     }
   };
+
+  if (Platform.OS === 'web') {
+    if (window.confirm('Deseja encerrar sua visita e liberar a mesa?')) executeLogout();
+  } else {
+    Alert.alert('Finalizar Visita', 'Deseja encerrar sua sessão? A mesa será liberada.', [
+      { text: 'Ficar', style: 'cancel' },
+      { text: 'Finalizar e Sair', style: 'destructive', onPress: executeLogout },
+    ]);
+  }
+};
 
   const isUser = role === 'USER';
   const isStaff = role === 'ADMIN' || role === 'MAID';
