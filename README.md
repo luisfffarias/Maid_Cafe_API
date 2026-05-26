@@ -21,5 +21,4 @@ O **Maid in Brasil** é um sistema web completo desenvolvido para modernizar e s
 
 ## 📐 arquitetura
 
-![App Screenshot]()
-
+![App Screenshot](frontend/assets/images/Diagrama.png)
